@@ -277,4 +277,4 @@ if prompt := st.chat_input("Hỏi Gemini một điều gì đó..."):
 # Đảm bảo các đoạn mã này được giữ nguyên
 # Ví dụ:
 # st.sidebar.header("Cài đặt khác")
-# st.sidebar.slider("Tham số", 0.0, 1.
+# st.sidebar.slider("Tham số", 0.0, 1.0, 0.5)
