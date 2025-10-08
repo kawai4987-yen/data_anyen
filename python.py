@@ -183,3 +183,98 @@ if uploaded_file is not None:
 
 else:
     st.info("Vui lòng tải lên file Excel để bắt đầu phân tích.")
+import streamlit as st
+from google import genai
+from google.genai.errors import APIError
+
+# --- Cấu hình API Key và Khởi tạo Client ---
+# Sử dụng st.secrets để lấy API Key.
+try:
+    # 1. Lấy API Key từ Streamlit Secrets
+    api_key = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=api_key)
+    # 2. Khởi tạo client
+    client = genai.Client()
+except KeyError:
+    st.error("Lỗi cấu hình: Không tìm thấy 'GEMINI_API_KEY' trong Streamlit Secrets. "
+             "Vui lòng tạo tệp .streamlit/secrets.toml và thêm khóa API của bạn.")
+    st.stop()
+except Exception as e:
+    st.error(f"Lỗi khởi tạo Gemini Client: {e}")
+    st.stop()
+
+# --- Hằng số ---
+MODEL_NAME = "gemini-2.5-flash"
+
+# --- Khởi tạo Streamlit UI ---
+st.title("Ứng dụng Hỏi đáp với Gemini trên Streamlit ✨")
+st.write("Sử dụng mô hình Gemini để trò chuyện và nhận câu trả lời.")
+
+# --- Logic Chat ---
+
+## Khởi tạo Lịch sử Chat và Phiên Chat
+# Sử dụng st.session_state để lưu trữ trạng thái.
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "chat_session" not in st.session_state:
+    try:
+        # Bắt đầu một phiên chat mới với mô hình đã chọn
+        # Lưu phiên chat để duy trì lịch sử hội thoại
+        st.session_state.chat_session = client.chats.create(model=MODEL_NAME)
+    except Exception as e:
+        st.error(f"Lỗi khi khởi tạo Chat Session: {e}")
+        st.stop()
+
+## Hiển thị Lịch sử Chat
+for message in st.session_state.messages:
+    # Sử dụng st.chat_message để hiển thị tin nhắn
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+## Xử lý Input của Người dùng
+# st.chat_input tạo ra ô nhập liệu
+
+if prompt := st.chat_input("Hỏi Gemini một điều gì đó..."):
+    # Thêm tin nhắn của người dùng vào lịch sử và hiển thị
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Gửi tin nhắn đến Gemini và nhận phản hồi
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        
+        try:
+            # Gửi tin nhắn và bật streaming
+            response_stream = st.session_state.chat_session.send_message(prompt, stream=True)
+
+            # Đọc và hiển thị phản hồi theo kiểu streaming
+            for chunk in response_stream:
+                # Sử dụng .text để lấy nội dung từ chunk
+                full_response += (chunk.text or "")
+                # Cập nhật bộ giữ chỗ với nội dung hiện tại + con trỏ
+                message_placeholder.markdown(full_response + "▌")
+            
+            # Cập nhật phản hồi cuối cùng (bỏ con trỏ)
+            message_placeholder.markdown(full_response)
+        
+        except APIError as e:
+            error_message = f"Lỗi API (4xx/5xx): Vui lòng thử lại. Chi tiết: {e}"
+            st.error(error_message)
+            full_response = error_message
+        except Exception as e:
+            error_message = f"Lỗi không xác định khi gọi API: {e}"
+            st.error(error_message)
+            full_response = error_message
+
+    # Thêm phản hồi của AI (hoặc thông báo lỗi) vào lịch sử
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+# --- Các đoạn mã khác của bạn (Giữ nguyên) ---
+# Đảm bảo các đoạn mã này được giữ nguyên
+# Ví dụ:
+# st.sidebar.header("Cài đặt khác")
+# st.sidebar.slider("Tham số", 0.0, 1.
